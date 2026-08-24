@@ -1,0 +1,51 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Set up Java JDK
+      uses: actions/setup-java@v3
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    - name: Extract zip and setup project
+      run: |
+        unzip -o stitch_gold_live_egy*.zip || true
+        mkdir -p www
+        if [ -f gold_live_dashboard_final.html ]; then
+          cp gold_live_dashboard_final.html www/index.html
+        elif [ -f index.html ]; then
+          cp index.html www/
+        else
+          find . -maxdepth 2 -name "*.html" -exec cp {} www/index.html \;
+        fi
+
+    - name: Build APK via Capacitor
+      run: |
+        npm init -y
+        npm install @capacitor/core @capacitor/cli @capacitor/android
+        npx cap init "GOLD LIVE" "com.goldlive.app" --web-dir www
+        npx cap add android
+        cd android && ./gradlew assembleDebug
+
+    - name: Upload APK Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: GOLD-LIVE-APK
+        path: android/app/build/outputs/apk/debug/app-debug.apk
