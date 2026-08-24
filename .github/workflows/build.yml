@@ -19,34 +19,32 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Verify Java 17
-      run: |
-        java -version
-        echo "JAVA_HOME=$JAVA_HOME"
-        "$JAVA_HOME/bin/java" -version
-
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
 
+    - name: Install Gradle 8.7
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: '8.7'
+
+    - name: Verify Java and Gradle
+      run: |
+        java -version
+        gradle --version
+
     - name: Install Cordova
       run: npm install -g cordova
-
-    - name: Verify Cordova and Gradle environment
-      run: |
-        cordova --version
-        echo "JAVA_HOME=$JAVA_HOME"
-        java -version
 
     - name: Extract zip and Create Cordova App
       run: |
         cordova create cordovaApp com.goldlive.app "GOLD LIVE"
+
         cd cordovaApp
 
         cordova platform add android@12.0.0
 
-        # استخراج الملف وتجهيز index.html
         unzip -o ../stitch_gold_live_egy*.zip -d temp_zip || true
 
         FOUND_FILE=$(find temp_zip .. -maxdepth 3 -name "*.html" | head -n 1)
@@ -61,9 +59,8 @@ jobs:
     - name: Build APK
       run: |
         cd cordovaApp
-        export JAVA_HOME="${JAVA_HOME}"
-        export PATH="${JAVA_HOME}/bin:${PATH}"
         java -version
+        gradle --version
         cordova build android --debug
 
     - name: Upload APK Artifact
