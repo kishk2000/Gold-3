@@ -13,24 +13,29 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Set up Java JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '11'
+
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '18'
 
-    - name: Set up Java JDK
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'zulu'
-        java-version: '17'
+    - name: Install Cordova
+      run: npm install -g cordova
 
-    - name: Extract zip and prepare index.html
+    - name: Extract zip and Create Cordova App
       run: |
-        mkdir -p www
-        unzip -o stitch_gold_live_egy*.zip -d temp_zip || true
+        cordova create cordovaApp com.goldlive.app "GOLD LIVE"
+        cd cordovaApp
+        cordova platform add android@10.1.2
         
-        # البحث عن أي ملف HTML وتسميته index.html داخل مجلد www
-        FOUND_FILE=$(find temp_zip . -maxdepth 3 -name "*.html" | head -n 1)
+        # استخراج الملف وتجهيز index.html
+        unzip -o ../stitch_gold_live_egy*.zip -d temp_zip || true
+        FOUND_FILE=$(find temp_zip .. -maxdepth 3 -name "*.html" | head -n 1)
         
         if [ -n "$FOUND_FILE" ]; then
           cp "$FOUND_FILE" www/index.html
@@ -38,17 +43,13 @@ jobs:
           echo "HTML File not found!" && exit 1
         fi
 
-    - name: Build APK via Capacitor
+    - name: Build APK
       run: |
-        npm init -y
-        npm install @capacitor/core @capacitor/cli @capacitor/android
-        npx cap init "GOLD LIVE" "com.goldlive.app" --web-dir www
-        npx cap add android
-        npx cap copy android
-        cd android && ./gradlew assembleDebug
+        cd cordovaApp
+        cordova build android --debug
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
         name: GOLD-LIVE-APK
-        path: android/app/build/outputs/apk/debug/app-debug.apk
+        path: cordovaApp/platforms/android/app/build/outputs/apk/debug/app-debug.apk
