@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
     - name: Checkout repository
       uses: actions/checkout@v4
 
@@ -35,33 +36,72 @@ jobs:
         gradle --version
 
     - name: Install Cordova
-      run: npm install -g cordova
+      run: |
+        npm install -g cordova
+        cordova --version
 
-    - name: Extract zip and Create Cordova App
+    - name: Create Cordova App
       run: |
         cordova create cordovaApp com.goldlive.app "GOLD LIVE"
 
+    - name: Add Android Platform
+      run: |
+        cd cordovaApp
+        cordova platform add android@12.0.0
+
+    - name: Extract GOLD LIVE HTML
+      run: |
         cd cordovaApp
 
-        cordova platform add android@12.0.0
+        mkdir -p temp_zip
 
         unzip -o ../stitch_gold_live_egy*.zip -d temp_zip || true
 
-        FOUND_FILE=$(find temp_zip .. -maxdepth 3 -name "*.html" | head -n 1)
+        FOUND_FILE=$(find temp_zip -type f -name "*.html" | head -n 1)
 
         if [ -n "$FOUND_FILE" ]; then
+          echo "HTML found: $FOUND_FILE"
           cp "$FOUND_FILE" www/index.html
         else
-          echo "HTML File not found!"
+          echo "ERROR: HTML File not found!"
           exit 1
         fi
+
+    - name: Force Gradle Wrapper 8.7
+      run: |
+        cd cordovaApp/platforms/android
+
+        gradle wrapper --gradle-version 8.7 --distribution-type bin
+
+        chmod +x gradlew
+
+        echo "===== GRADLE VERSION ====="
+        ./gradlew --version
+
+    - name: Fix XmlParser
+      run: |
+        FILE="cordovaApp/platforms/android/CordovaLib/cordova.gradle"
+
+        sed -i '1i import groovy.xml.XmlParser' "$FILE"
+
+        echo "===== XmlParser fix applied ====="
+        head -10 "$FILE"
 
     - name: Build APK
       run: |
         cd cordovaApp
+
+        export JAVA_HOME="${JAVA_HOME}"
+        export PATH="${JAVA_HOME}/bin:${PATH}"
+
         java -version
-        gradle --version
-        cordova build android --debug
+
+        cd platforms/android
+        ./gradlew --version
+
+        cd ../..
+
+        cordova build android --debug --verbose
 
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
