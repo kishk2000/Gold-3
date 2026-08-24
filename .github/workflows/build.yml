@@ -38,7 +38,6 @@ jobs:
 
           if [ -z "$SDKMANAGER" ]; then
             echo "ERROR: sdkmanager not found"
-            find "$ANDROID_HOME" -maxdepth 4 -type f | head -100
             exit 1
           fi
 
@@ -57,10 +56,13 @@ jobs:
             "platforms;android-33" \
             "build-tools;33.0.2"
 
-      - name: Verify Android SDK
+      - name: Verify Java Android and Gradle
         run: |
           echo "===== JAVA ====="
           java -version
+
+          echo "===== JAVA HOME ====="
+          echo "$JAVA_HOME"
 
           echo "===== GRADLE ====="
           gradle --version
@@ -109,17 +111,21 @@ jobs:
             exit 1
           fi
 
-      - name: Force Gradle Wrapper 8.7
+      - name: Set Gradle Wrapper to 8.7
         run: |
           cd cordovaApp/platforms/android
 
-          gradle wrapper \
-            --gradle-version 8.7 \
-            --distribution-type bin
+          echo "===== ORIGINAL GRADLE WRAPPER ====="
+          cat gradle/wrapper/gradle-wrapper.properties
+
+          sed -i 's#distributionUrl=.*#distributionUrl=https\\://services.gradle.org/distributions/gradle-8.7-bin.zip#' gradle/wrapper/gradle-wrapper.properties
 
           chmod +x gradlew
 
-          echo "===== GRADLE WRAPPER VERSION ====="
+          echo "===== UPDATED GRADLE WRAPPER ====="
+          cat gradle/wrapper/gradle-wrapper.properties
+
+          echo "===== GRADLE VERSION ====="
           ./gradlew --version
 
       - name: Fix XmlParser
