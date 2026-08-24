@@ -2,7 +2,7 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -10,101 +10,124 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Set up Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
 
-    - name: Set up Java JDK 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
+      - name: Install Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.7"
 
-    - name: Install Gradle 8.7
-      uses: gradle/actions/setup-gradle@v4
-      with:
-        gradle-version: '8.7'
+      - name: Install Android Build Tools 33.0.2
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2"
 
-    - name: Verify Java and Gradle
-      run: |
-        java -version
-        gradle --version
+      - name: Verify Java Android and Gradle
+        run: |
+          echo "===== JAVA ====="
+          java -version
 
-    - name: Install Cordova
-      run: |
-        npm install -g cordova
-        cordova --version
+          echo "===== JAVA HOME ====="
+          echo "$JAVA_HOME"
 
-    - name: Create Cordova App
-      run: |
-        cordova create cordovaApp com.goldlive.app "GOLD LIVE"
+          echo "===== GRADLE ====="
+          gradle --version
 
-    - name: Add Android Platform
-      run: |
-        cd cordovaApp
-        cordova platform add android@12.0.0
+          echo "===== ANDROID BUILD TOOLS ====="
+          ls -la "$ANDROID_HOME/build-tools/33.0.2"
 
-    - name: Extract GOLD LIVE HTML
-      run: |
-        cd cordovaApp
+      - name: Install Cordova
+        run: |
+          npm install -g cordova
+          cordova --version
 
-        mkdir -p temp_zip
+      - name: Create Cordova App
+        run: |
+          cordova create cordovaApp com.goldlive.app "GOLD LIVE"
 
-        unzip -o ../stitch_gold_live_egy*.zip -d temp_zip || true
+      - name: Add Android Platform
+        run: |
+          cd cordovaApp
+          cordova platform add android@12.0.0
 
-        FOUND_FILE=$(find temp_zip -type f -name "*.html" | head -n 1)
+      - name: Extract GOLD LIVE HTML
+        run: |
+          cd cordovaApp
 
-        if [ -n "$FOUND_FILE" ]; then
-          echo "HTML found: $FOUND_FILE"
-          cp "$FOUND_FILE" www/index.html
-        else
-          echo "ERROR: HTML File not found!"
-          exit 1
-        fi
+          mkdir -p temp_zip
 
-    - name: Force Gradle Wrapper 8.7
-      run: |
-        cd cordovaApp/platforms/android
+          unzip -o ../stitch_gold_live_egy*.zip -d temp_zip || true
 
-        gradle wrapper --gradle-version 8.7 --distribution-type bin
+          FOUND_FILE=$(find temp_zip -type f -name "*.html" | head -n 1)
 
-        chmod +x gradlew
+          if [ -n "$FOUND_FILE" ]; then
+            echo "HTML found: $FOUND_FILE"
+            cp "$FOUND_FILE" www/index.html
+          else
+            echo "ERROR: HTML File not found!"
+            exit 1
+          fi
 
-        echo "===== GRADLE VERSION ====="
-        ./gradlew --version
+      - name: Force Gradle Wrapper 8.7
+        run: |
+          cd cordovaApp/platforms/android
 
-    - name: Fix XmlParser
-      run: |
-        FILE="cordovaApp/platforms/android/CordovaLib/cordova.gradle"
+          gradle wrapper --gradle-version 8.7 --distribution-type bin
 
-        sed -i '1i import groovy.xml.XmlParser' "$FILE"
+          chmod +x gradlew
 
-        echo "===== XmlParser fix applied ====="
-        head -10 "$FILE"
+          echo "===== GRADLE WRAPPER ====="
+          ./gradlew --version
 
-    - name: Build APK
-      run: |
-        cd cordovaApp
+      - name: Fix XmlParser
+        run: |
+          FILE="cordovaApp/platforms/android/CordovaLib/cordova.gradle"
 
-        export JAVA_HOME="${JAVA_HOME}"
-        export PATH="${JAVA_HOME}/bin:${PATH}"
+          sed -i '1i import groovy.xml.XmlParser' "$FILE"
 
-        java -version
+          echo "===== XMLPARSER FIX ====="
+          head -10 "$FILE"
 
-        cd platforms/android
-        ./gradlew --version
+      - name: Build APK
+        run: |
+          cd cordovaApp
 
-        cd ../..
+          export JAVA_HOME="${JAVA_HOME}"
+          export PATH="${JAVA_HOME}/bin:${PATH}"
 
-        cordova build android --debug --verbose
+          echo "===== JAVA ====="
+          java -version
 
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: GOLD-LIVE-APK
-        path: cordovaApp/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          echo "===== GRADLE ====="
+          cd platforms/android
+          ./gradlew --version
+
+          cd ../..
+
+          echo "===== BUILD APK ====="
+          cordova build android --debug --verbose
+
+      - name: Find APK
+        if: always()
+        run: |
+          echo "===== APK FILES ====="
+          find cordovaApp/platforms/android -type f -name "*.apk" -print
+
+      - name: Upload APK Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: GOLD-LIVE-APK
+          path: cordovaApp/platforms/android/app/build/outputs/apk/debug/app-debug.apk
